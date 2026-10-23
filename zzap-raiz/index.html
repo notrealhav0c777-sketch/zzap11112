@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>ZZAP</title>
+<style>
+:root{color-scheme:dark;--bg:#0b0f12;--pn:#131a1f;--ln:#24303a;--fg:#e8eef2;--mu:#8a9aa6;--ac:#22c55e;--rd:#ef4444;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+*{box-sizing:border-box}html,body{height:100%;margin:0}
+body{background:var(--bg);color:var(--fg);font:15px system-ui,-apple-system,Segoe UI,sans-serif}
+button,input{font:inherit;color:inherit}
+button{background:var(--ln);border:0;padding:8px 12px;border-radius:8px;cursor:pointer}
+button.p{background:var(--ac);color:#04210f;font-weight:700}button.d{background:var(--rd)}button.s{padding:4px 8px;font-size:12px}
+input[type=text]{width:100%;background:#0b0f12;border:1px solid var(--ln);border-radius:8px;padding:10px}
+#app{height:100%;display:grid;grid-template-columns:320px 1fr}
+.side{background:var(--pn);border-right:1px solid var(--ln);display:flex;flex-direction:column;min-height:0}
+.main{display:flex;flex-direction:column;min-height:0;min-width:0}
+.hd{display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--pn);border-bottom:1px solid var(--ln)}
+.hd .g{flex:1;min-width:0}.list{overflow:auto;flex:1}
+.it{display:flex;gap:10px;align-items:center;padding:10px 12px;cursor:pointer;border-bottom:1px solid var(--ln)}
+.it:hover{background:#18222a}.it .t{flex:1;min-width:0}.it small,.mu{color:var(--mu)}
+.it small{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.av{border-radius:50%;object-fit:cover;background:#2a3a46;display:flex;align-items:center;justify-content:center;flex:none;width:40px;height:40px}
+.msgs{flex:1;overflow:auto;padding:14px;display:flex;flex-direction:column;gap:6px}
+.m{max-width:min(78%,420px);padding:7px 10px;border-radius:10px;background:#1c2730;word-wrap:break-word}
+.m.me{align-self:flex-end;color:#fff}.m b{display:block;font-size:12px;color:var(--ac)}
+.m img,.m video{max-width:100%;border-radius:8px}.m audio{max-width:100%}.m a{color:#7dd3fc}
+.m.j{align-self:center;background:transparent;color:var(--mu);font-style:italic}
+.cmp{display:flex;gap:6px;padding:10px;background:var(--pn);border-top:1px solid var(--ln);align-items:center}
+.cmp label{cursor:pointer;padding:6px}
+.ov{position:fixed;inset:0;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;z-index:20;padding:12px}
+.bx{background:var(--pn);border:1px solid var(--ln);border-radius:14px;padding:16px;width:min(440px,100%);max-height:90%;overflow:auto;display:flex;flex-direction:column;gap:10px}
+.ban{height:90px;border-radius:10px;background:linear-gradient(135deg,#14532d,#0b0f12) center/cover}
+.row{display:flex;gap:8px;align-items:center}.row>*:first-child{flex:1}
+.big{position:fixed;inset:0;z-index:50;background:rgba(0,0,0,.85);display:flex;align-items:center;justify-content:center;font-size:clamp(2.4rem,12vw,8rem);font-weight:900;text-align:center;color:#fff;animation:pop .4s}
+@keyframes pop{from{transform:scale(.3);opacity:0}}
+.num{font-size:2rem;font-weight:800;letter-spacing:3px;text-align:center;color:var(--ac)}
+.toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:#fff;color:#000;padding:8px 14px;border-radius:20px;z-index:60}
+.login{max-width:420px;margin:8vh auto;padding:20px;display:flex;flex-direction:column;gap:12px}
+.logo{font-size:2.4rem;font-weight:900;letter-spacing:4px;text-align:center}
+.back{display:none}
+@media(max-width:700px){#app{grid-template-columns:1fr}.open .side{display:none}#app:not(.open) .main{display:none}.back{display:inline-block}}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script>
+const K='zzap_db',$=s=>document.querySelector(s),now=()=>Date.now();
+const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+function load(){try{return JSON.parse(localStorage.getItem(K))||{users:{},chats:{},jogar:{}}}catch(e){return{users:{},chats:{},jogar:{}}}}
+let db=load(),me=null,modal=null,cur=null,draft='',tmp='',sendT=0,att=[],shown={},rec=null,chunks=[];
+try{me=sessionStorage.getItem('zzap_me')}catch(e){}
+if(me&&!db.users[me])me=null;
+function save(){try{localStorage.setItem(K,JSON.stringify(db))}catch(e){toast('Armazenamento cheio: arquivo muito grande')}}
+addEventListener('storage',e=>{if(e.key===K){db=load();render()}});
+function toast(t){const d=document.createElement('div');d.className='toast';d.textContent=t;document.body.appendChild(d);setTimeout(()=>d.remove(),2200)}
+const R=(a,b)=>Math.floor(Math.random()*(b-a+1))+a;
+const U=n=>db.users[n]||{name:n,contacts:{},blocked:[]};
+const av=(n,s=40)=>{const u=U(n);return u.photo?`<img class="av" style="width:${s}px;height:${s}px" src="${u.photo}">`:`<div class="av" style="width:${s}px;height:${s}px">${esc((u.name||'?')[0].toUpperCase())}</div>`};
+function img(file,max,cb){const r=new FileReader();r.onload=()=>{const i=new Image();i.onload=()=>{const k=Math.min(1,max/Math.max(i.width,i.height)),c=document.createElement('canvas');c.width=i.width*k;c.height=i.height*k;c.getContext('2d').drawImage(i,0,0,c.width,c.height);cb(c.toDataURL('image/jpeg',.8))};i.src=r.result};r.readAsDataURL(file)}
+const dmId=n=>[me,n].sort().join('|');
+function dm(n){const id=dmId(n);if(!db.chats[id])db.chats[id]={id,type:'dm',members:[me,n],msgs:[]};return db.chats[id]}
+const title=c=>c.type==='g'?c.name:U(c.members.find(x=>x!==me)).name;
+const role=(c,n)=>c.owner===n?'dono':(c.admins||[]).includes(n)?'adm':'membro';
+function chatsOf(){const u=db.users[me],l=[];
+Object.keys(u.contacts).filter(n=>u.contacts[n]==='ok'&&!u.blocked.includes(n)).forEach(n=>l.push(dm(n)));
+Object.values(db.chats).filter(c=>c.type==='g'&&c.members.includes(me)).forEach(c=>l.push(c));
+const lt=c=>c.msgs.length?c.msgs[c.msgs.length-1].t:0;return l.sort((a,b)=>lt(b)-lt(a))}
+function render(){
+if(!me){return login()}
+const u=db.users[me],t=now(),c=cur&&db.chats[cur];
+const reqs=Object.keys(u.contacts).filter(n=>u.contacts[n]==='pending');
+const side=`<div class="side"><div class="hd" data-a="prof" style="cursor:pointer">${av(me)}<div class="g"><b>${esc(u.name)}</b><div class="mu" style="font-size:12px">${me}</div></div></div>
+<div class="row" style="padding:8px"><button data-a="add">➕ Adicionar</button><button data-a="newg">👥 Grupo</button></div>
+${reqs.map(n=>`<div class="it" style="background:#1a2a1f">${av(n)}<div class="t"><b>${esc(U(n).name)}</b><small>quer falar com você · ${n}</small></div><button class="s p" data-a="acc" data-n="${n}">Aceitar</button><button class="s" data-a="dec" data-n="${n}">Recusar</button><button class="s d" data-a="blk" data-n="${n}">Bloquear</button></div>`).join('')}
+<div class="list">${chatsOf().map(x=>{const l=x.msgs[x.msgs.length-1],o=x.type==='g'?`<div class="av">👥</div>`:av(x.members.find(y=>y!==me));
+return`<div class="it" data-a="open" data-id="${x.id}">${x.type==='g'&&x.photo?`<img class="av" src="${x.photo}">`:o}<div class="t"><b>${esc(title(x))}</b><small>${l?esc(l.type==='text'?l.v:'['+l.type+']'):'Sem mensagens'}</small></div></div>`}).join('')||'<p class="mu" style="padding:14px">Nenhuma conversa. Adicione alguém pelo número.</p>'}</div></div>`;
+let main=`<div class="main"><div class="mu" style="margin:auto">Escolha uma conversa</div></div>`;
+if(c){const g=c.type==='g',o=c.members.find(x=>x!==me);
+main=`<div class="main"><div class="hd"><button class="back" data-a="back">←</button>${g?(c.photo?`<img class="av" src="${c.photo}">`:'<div class="av">👥</div>'):av(o)}<div class="g"><b>${esc(title(c))}</b><div class="mu" style="font-size:12px">${g?c.members.length+' membros':o}</div></div>${g?'<button data-a="gp">⚙️</button>':`<button class="s d" data-a="blk" data-n="${o}">Bloquear</button>`}</div>
+<div class="msgs" id="ms" style="background:${esc(u.bg)}">${c.msgs.slice(-200).map(m=>{
+if(m.type==='jogar')return`<div class="m j">🎮 ${esc(U(m.from).name)} chamou: BORA JOGAR?</div>`;
+const mine=m.from===me;let b;
+if(m.type==='img')b=`<img src="${m.v}">`;else if(m.type==='video')b=`<video controls src="${m.v}"></video>`;else if(m.type==='audio')b=`<audio controls src="${m.v}"></audio>`;
+else b=esc(m.v).replace(/(https?:\/\/[^\s]+)/g,'<a href="$1" target="_blank" rel="noopener noreferrer">$1</a>');
+return`<div class="m ${mine?'me':''}" ${mine?`style="background:${esc(u.bubble)}"`:''}>${g&&!mine?`<b>${esc(U(m.from).name)}</b>`:''}${b}</div>`}).join('')}</div>
+<div class="cmp"><label>📷<input type="file" accept="image/*" hidden data-k="img"></label><label>🎬<input type="file" accept="video/*" hidden data-k="video"></label><label>🎵<input type="file" accept="audio/*" hidden data-k="audio"></label><button data-a="mic" id="mic">${rec?'⏹':'🎤'}</button>
+<input type="text" id="msg" placeholder="Mensagem ou /Jogar" value="${esc(draft)}"><button class="p" data-a="send">➤</button></div></div>`}
+$('#root').innerHTML=`<div id="app" class="${c?'open':''}">${side}${main}</div>${modalHtml()}`;
+const ms=$('#ms');if(ms)ms.scrollTop=ms.scrollHeight;
+checkJogar();
+}
+function modalHtml(){if(!modal)return'';const u=db.users[me],c=db.chats[cur];let h='';
+if(modal==='prof')h=`<div class="ban" style="${u.banner?`background-image:url(${u.banner})`:''}"></div><div class="row">${av(me,56)}<div><div class="mu">Seu número</div><b>${me}</b> <button class="s" data-a="copy">Copiar</button></div></div>
+<input type="text" id="pn" value="${esc(u.name)}" placeholder="Nome" maxlength="30"><input type="text" id="pb" value="${esc(u.bio||'')}" placeholder="Bio" maxlength="100">
+<div class="row"><span>Foto</span><input type="file" accept="image/*" data-k="photo"></div><div class="row"><span>Banner</span><input type="file" accept="image/*" data-k="banner"></div>
+<div class="row"><span>Cor das minhas mensagens</span><input type="color" id="pc" value="${u.bubble}"></div><div class="row"><span>Fundo da conversa</span><input type="color" id="pg" value="${u.bg}"></div>
+<button class="p" data-a="saveprof">Salvar</button><button data-a="logout">Sair</button>`;
+else if(modal==='add')h=`<b>Adicionar pessoa</b><input type="text" id="an" placeholder="Número (ex: 122-492-1)"><button class="p" data-a="doadd">Enviar pedido</button>
+${u.blocked.length?`<div class="mu">Bloqueados:</div>`+u.blocked.map(n=>`<div class="row"><span>${esc(U(n).name)} ${n}</span><button class="s" data-a="unb" data-n="${n}">Desbloquear</button></div>`).join(''):''}`;
+else if(modal==='newg')h=`<b>Criar grupo</b><input type="text" id="gn" placeholder="Nome do grupo" maxlength="40"><div class="row"><span>Foto</span><input type="file" accept="image/*" data-k="gphoto"></div><button class="p" data-a="mkg">Criar</button>`;
+else if(modal==='gp'&&c){const my=role(c,me),t=now();
+h=`<b>${esc(c.name)}</b><div class="mu">Você é: ${my}</div><div class="row"><input type="text" id="gm" placeholder="Número para adicionar"><button data-a="gadd">Adicionar</button></div>`+
+c.members.map(n=>{const r=role(c,n),m=(c.mute||{})[n],p=(c.pun||{})[n]>t;let b='';
+const canMod=n!==me&&((my==='dono')||(my==='adm'&&r==='membro'));
+if(canMod)b+=`<button class="s" data-a="gmute" data-n="${n}">${m?'Dessilenciar':'Silenciar'}</button><button class="s" data-a="gpun" data-n="${n}">Castigo 2min</button><button class="s d" data-a="grm" data-n="${n}">Remover</button>`;
+if(my==='dono'&&n!==me)b+=`<button class="s" data-a="gadm" data-n="${n}">${r==='adm'?'Tirar adm':'Dar adm'}</button><button class="s" data-a="gown" data-n="${n}">Passar posse</button>`;
+return`<div style="border-top:1px solid var(--ln);padding-top:8px"><div class="row">${av(n,30)}<span>${esc(U(n).name)} <span class="mu">· ${r}${m?' · silenciado':''}${p?' · castigado':''}</span></span></div><div class="row" style="flex-wrap:wrap;margin-top:6px">${b}</div></div>`}).join('')+
+(my!=='dono'?`<button class="d" data-a="gleave">Sair do grupo</button>`:'');}
+return`<div class="ov" data-a="close"><div class="bx">${h}<button data-a="close">Fechar</button></div></div>`}
+function login(){
+$('#root').innerHTML=`<div class="login"><div class="logo">ZZAP</div><p class="mu" style="text-align:center">Mensagens com número digital</p>
+<div class="bx" style="width:100%"><b>Novo por aqui?</b>${tmp?`<div class="num">${tmp}</div><p class="mu">Copie seu número e guarde. Ele é o seu login.</p><div class="row"><button data-a="copy">Copiar número</button><button class="p" data-a="login" data-n="${tmp}">Entrar</button></div>`:`<button class="p" data-a="gen">Gerar meu número</button>`}</div>
+<div class="bx" style="width:100%"><b>Já tenho número</b><input type="text" id="ln" placeholder="122-492-1"><button data-a="login">Entrar</button></div></div>`}
+function checkJogar(){if(!me)return;const t=now();Object.values(db.chats).filter(c=>c.members.includes(me)).forEach(c=>{c.msgs.slice(-5).forEach(m=>{
+if(m.type==='jogar'&&t-m.t<4000&&!shown[m.id]){shown[m.id]=1;const d=document.createElement('div');d.className='big';d.textContent='BORA JOGAR?';document.body.appendChild(d);setTimeout(()=>d.remove(),4000-(t-m.t))}})})}
+function send(type,v){
+const u=db.users[me],c=db.chats[cur];if(!c)return;const t=now();
+att=att.filter(x=>t-x<10000);att.push(t);
+if(att.length>=50){u.pun=t+120000;att=[];save();return toast('Spam detectado: castigo de 2 minutos!')}
+if(u.pun>t)return toast('Castigado: espere '+Math.ceil((u.pun-t)/1000)+'s');
+if(c.type==='g'){if((c.mute||{})[me])return toast('Você está silenciado neste grupo');const p=(c.pun||{})[me];if(p>t)return toast('Castigado no grupo por '+Math.ceil((p-t)/1000)+'s')}
+else{const o=c.members.find(x=>x!==me);if(U(o).blocked.includes(me)||u.blocked.includes(o))return toast('Conversa bloqueada')}
+if(t-sendT<1000)return toast('Calma! 1 mensagem por segundo');
+if(type==='text'&&v.trim().toLowerCase()==='/jogar'){const d=new Date().toDateString();if(db.jogar[me]===d)return toast('/Jogar só pode 1 vez por dia');db.jogar[me]=d;type='jogar';v=''}
+if(type==='text'&&!v.trim())return;
+sendT=t;draft='';c.msgs.push({id:t+'-'+me,from:me,t,type,v});save();render()}
+function file(k,f){if(!f)return;
+if(k==='img')return img(f,800,d=>send('img',d));
+if(k==='photo'||k==='banner'||k==='gphoto')return img(f,k==='banner'?700:200,d=>{if(k==='gphoto')tmp=d;else{db.users[me][k]=d;save()}render()});
+if(f.size>1500000)return toast('Arquivo grande demais (máx 1,5 MB nesta versão)');
+const r=new FileReader();r.onload=()=>send(k,r.result);r.readAsDataURL(f)}
+const A={
+gen(){const n=R(100,999)+'-'+R(100,999)+'-'+R(0,9);db.users[n]={name:'Usuário '+n.slice(0,3),bio:'',photo:'',banner:'',bubble:'#1f8f5f',bg:'#0b141a',contacts:{},blocked:[]};save();tmp=n;render()},
+login(d){const n=(d.n||$('#ln').value).trim();if(!db.users[n])return toast('Número não encontrado');me=n;tmp='';try{sessionStorage.setItem('zzap_me',n)}catch(e){}render()},
+copy(){const n=tmp||me;try{navigator.clipboard.writeText(n);toast('Copiado: '+n)}catch(e){toast('Copie: '+n)}},
+logout(){me=null;cur=null;modal=null;try{sessionStorage.removeItem('zzap_me')}catch(e){}render()},
+open(d){cur=d.id;render()},back(){cur=null;render()},prof(){modal='prof';render()},add(){modal='add';render()},newg(){modal='newg';tmp='';render()},close(){modal=null;render()},
+saveprof(){const u=db.users[me];u.name=$('#pn').value.trim()||u.name;u.bio=$('#pb').value;u.bubble=$('#pc').value;u.bg=$('#pg').value;save();modal=null;render()},
+doadd(){const n=$('#an').value.trim(),u=db.users[me];if(!db.users[n]||n===me)return toast('Número inválido');if(u.contacts[n]==='ok')return toast('Já é seu contato');
+if(db.users[n].blocked.includes(me))return toast('Pedido não pôde ser enviado');
+if(u.contacts[n]==='pending'){A.acc({n});return}u.contacts[n]='sent';db.users[n].contacts[me]='pending';save();modal=null;toast('Pedido enviado');render()},
+acc(d){db.users[me].contacts[d.n]='ok';db.users[d.n].contacts[me]='ok';save();render()},
+dec(d){delete db.users[me].contacts[d.n];delete db.users[d.n].contacts[me];save();render()},
+blk(d){const u=db.users[me];if(!u.blocked.includes(d.n))u.blocked.push(d.n);delete u.contacts[d.n];delete db.users[d.n].contacts[me];if(cur===dmId(d.n))cur=null;save();render()},
+unb(d){const u=db.users[me];u.blocked=u.blocked.filter(x=>x!==d.n);save();render()},
+send(){const i=$('#msg');send('text',i.value);},
+async mic(){if(rec){rec.stop();return}try{const s=await navigator.mediaDevices.getUserMedia({audio:true});chunks=[];rec=new MediaRecorder(s);rec.ondataavailable=e=>chunks.push(e.data);
+rec.onstop=()=>{s.getTracks().forEach(t=>t.stop());const b=new Blob(chunks,{type:rec.mimeType});rec=null;file('audio',b)};rec.start();render()}catch(e){rec=null;toast('Microfone indisponível. Use 🎵 para enviar um áudio.')}},
+mkg(){const n=$('#gn').value.trim();if(!n)return toast('Dê um nome ao grupo');const id='g'+now();db.chats[id]={id,type:'g',name:n,photo:tmp,owner:me,admins:[],members:[me],mute:{},pun:{},msgs:[]};tmp='';save();modal=null;cur=id;render()},
+gp(){modal='gp';render()},
+gadd(){const c=db.chats[cur],n=$('#gm').value.trim(),u=db.users[me];if(role(c,me)==='membro')return toast('Só adm pode adicionar');if(u.contacts[n]!=='ok')return toast('Adicione a pessoa como contato primeiro');if(c.members.includes(n))return toast('Já está no grupo');c.members.push(n);save();render()},
+gmute(d){const c=db.chats[cur];c.mute[d.n]=!c.mute[d.n];save();render()},
+gpun(d){const c=db.chats[cur];c.pun[d.n]=now()+120000;save();toast('Castigo de 2 min aplicado');render()},
+grm(d){const c=db.chats[cur];c.members=c.members.filter(x=>x!==d.n);c.admins=c.admins.filter(x=>x!==d.n);save();render()},
+gadm(d){const c=db.chats[cur];if(role(c,me)!=='dono')return;c.admins=c.admins.includes(d.n)?c.admins.filter(x=>x!==d.n):[...c.admins,d.n];save();render()},
+gown(d){const c=db.chats[cur];if(role(c,me)!=='dono')return;c.admins=[...c.admins.filter(x=>x!==d.n),me];c.owner=d.n;save();render()},
+gleave(){const c=db.chats[cur];c.members=c.members.filter(x=>x!==me);c.admins=c.admins.filter(x=>x!==me);cur=null;modal=null;save();render()}
+};
+document.addEventListener('click',e=>{const el=e.target.closest('[data-a]');if(!el||!A[el.dataset.a])return;if(el.classList.contains('ov')&&e.target!==el)return;A[el.dataset.a](el.dataset)});
+document.addEventListener('change',e=>{if(e.target.dataset.k){file(e.target.dataset.k,e.target.files[0]);e.target.value=''}});
+document.addEventListener('input',e=>{if(e.target.id==='msg')draft=e.target.value});
+document.addEventListener('keydown',e=>{if(e.key==='Enter'&&e.target.id==='msg')A.send()});
+render();
+</script>
+</body>
+</html>
